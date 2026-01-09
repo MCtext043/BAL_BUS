@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация - BAL_BUS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    .alert {
+        display: none;
+    }
+    .alert.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-person-plus"></i> Регистрация
+                </h4>
+            </div>
+            <div class="card-body">
+                <div id="alertContainer"></div>
+                
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">
+                            <i class="bi bi-envelope"></i> Email
+                        </label>
+                        <input 
+                            type="email" 
+                            class="form-control" 
+                            id="email" 
+                            name="email"
+                            required
+                            placeholder="example@mail.com"
+                        >
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="bi bi-person"></i> Имя пользователя
+                        </label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="username" 
+                            name="username"
+                            required
+                            minlength="3"
+                            placeholder="username"
+                        >
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">
+                            <i class="bi bi-person-badge"></i> Полное имя (необязательно)
+                        </label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="full_name" 
+                            name="full_name"
+                            placeholder="Иван Иванов"
+                        >
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="bi bi-lock"></i> Пароль
+                        </label>
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="password" 
+                            name="password"
+                            required
+                            minlength="6"
+                            placeholder="Минимум 6 символов"
+                        >
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">
+                            <i class="bi bi-lock-fill"></i> Подтверждение пароля
+                        </label>
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="password_confirm" 
+                            name="password_confirm"
+                            required
+                            placeholder="Повторите пароль"
+                        >
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" value="" id="is_dispatcher">
+                        <label class="form-check-label" for="is_dispatcher">
+                            Я диспетчер (нужен для редактирования расписания)
+                        </label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="bi bi-check-circle"></i> Зарегистрироваться
+                        </button>
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Назад
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const form = document.getElementById('registerForm');
+    const alertContainer = document.getElementById('alertContainer');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function showAlert(message, type = 'danger') {
+        alertContainer.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+
+    function setFieldError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        field.classList.add('is-invalid');
+        const feedback = field.nextElementSibling;
+        if (feedback && feedback.classList.contains('invalid-feedback')) {
+            feedback.textContent = message;
+        }
+    }
+
+    function clearFieldError(fieldId) {
+        const field = document.getElementById(fieldId);
+        field.classList.remove('is-invalid');
+    }
+
+    function clearAllErrors() {
+        ['email', 'username', 'password', 'password_confirm'].forEach(clearFieldError);
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAllErrors();
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        data.is_dispatcher = document.getElementById('is_dispatcher').checked;
+        
+        // Проверка совпадения паролей
+        if (data.password !== data.password_confirm) {
+            setFieldError('password_confirm', 'Пароли не совпадают');
+            return;
+        }
+
+        // Удаляем password_confirm перед отправкой
+        delete data.password_confirm;
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Регистрация...';
+
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                // Если ответ не JSON, показываем текст ошибки
+                const text = await response.text();
+                showAlert(`Ошибка сервера: ${text || response.statusText}`);
+                return;
+            }
+
+            if (response.ok) {
+                showAlert(
+                    `Успешно! Пользователь ${result.username} зарегистрирован.`,
+                    'success'
+                );
+                form.reset();
+                
+                // Перенаправление через 2 секунды
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                // Обработка ошибок валидации
+                if (result.detail) {
+                    if (Array.isArray(result.detail)) {
+                        result.detail.forEach(error => {
+                            if (error.loc && error.loc.length > 1) {
+                                const field = error.loc[error.loc.length - 1];
+                                setFieldError(field, error.msg);
+                            }
+                        });
+                    } else {
+                        showAlert(result.detail);
+                    }
+                } else {
+                    showAlert('Ошибка при регистрации. Попробуйте еще раз.');
+                }
+            }
+        } catch (error) {
+            console.error('Network Error:', error);
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                showAlert('Ошибка соединения с сервером. Убедитесь, что сервер запущен на http://localhost:8001');
+            } else {
+                showAlert(`Ошибка: ${error.message || 'Неизвестная ошибка'}`);
+            }
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Зарегистрироваться';
+        }
+    });
+</script>
+{% endblock %}
+
