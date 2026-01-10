@@ -1,7 +1,7 @@
 """
 Схемы для пользователя
 """
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -16,6 +16,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Схема для создания пользователя"""
     password: str
+    consent_to_processing: bool = Field(..., description="Согласие на обработку персональных данных")
     
     @field_validator('password')
     @classmethod

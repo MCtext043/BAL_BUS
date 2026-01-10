@@ -23,6 +23,13 @@ router = APIRouter()
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Регистрация нового пользователя"""
     try:
+        # Проверка согласия на обработку данных
+        if not user_data.consent_to_processing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Необходимо согласие на обработку персональных данных"
+            )
+        
         # Проверка существования email
         result = await db.execute(
             select(User).where(User.email == user_data.email)

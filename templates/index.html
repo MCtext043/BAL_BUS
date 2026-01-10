@@ -70,10 +70,11 @@
                             <th><i class="bi bi-clock me-1"></i>Отправление</th>
                             <th><i class="bi bi-clock-history me-1"></i>Прибытие</th>
                             <th><i class="bi bi-currency-exchange me-1"></i>Цена</th>
+                            <th><i class="bi bi-ticket-perforated me-1"></i>Действие</th>
                         </tr>
                     </thead>
                     <tbody id="tripsBody">
-                        <tr><td colspan="5" class="text-center py-4">
+                        <tr><td colspan="6" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Загрузка...</span>
                             </div>
@@ -86,7 +87,8 @@
 </div>
 
 <!-- Контент для диспетчера (форма входа/регистрации) -->
-<div id="dispatcherAuth" style="display:none;">
+<div id="dispatcherAuth" style="
+display:none;">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card shadow-lg border-0">
@@ -141,10 +143,16 @@
                                     <label class="form-label fw-bold"><i class="bi bi-lock-fill me-1"></i>Подтверждение пароля</label>
                                     <input type="password" class="form-control" id="regPasswordConfirm" required>
                                 </div>
-                                <div class="form-check mb-4">
+                                <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="isDispatcher" checked>
                                     <label class="form-check-label fw-bold" for="isDispatcher">
                                         <i class="bi bi-shield-check me-1"></i>Я диспетчер
+                                    </label>
+                                </div>
+                                <div class="form-check mb-4">
+                                    <input class="form-check-input" type="checkbox" id="regConsent" required>
+                                    <label class="form-check-label fw-bold" for="regConsent">
+                                        <i class="bi bi-shield-check me-1"></i>Согласен с обработкой персональных данных
                                     </label>
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100 fw-bold">
@@ -254,6 +262,53 @@
     </div>
 </div>
 
+<!-- Модальное окно для покупки билета -->
+<div class="modal fade" id="purchaseTicketModal" tabindex="-1" aria-labelledby="purchaseTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h5 class="modal-title fw-bold" id="purchaseTicketModalLabel">
+                    <i class="bi bi-ticket-perforated me-2"></i>Покупка билета
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div id="purchaseAlert"></div>
+                <form id="purchaseTicketForm">
+                    <input type="hidden" id="purchaseTripId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="bi bi-person me-1"></i>ФИО</label>
+                        <input type="text" class="form-control" id="purchaseFullName" required placeholder="Иванов Иван Иванович">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="bi bi-envelope me-1"></i>Email</label>
+                        <input type="email" class="form-control" id="purchaseEmail" required placeholder="example@mail.ru">
+                    </div>
+                    <div class="mb-3">
+                        <div class="card bg-light p-3">
+                            <div id="purchaseTripInfo" class="small text-muted">
+                                <strong>Информация о рейсе:</strong><br>
+                                <span id="purchaseTripDetails"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="purchaseConsent" required>
+                        <label class="form-check-label fw-bold" for="purchaseConsent">
+                            <i class="bi bi-shield-check me-1"></i>Согласен с обработкой персональных данных
+                        </label>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary fw-bold">
+                            <i class="bi bi-cart-check me-2"></i>Купить билет
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -322,7 +377,7 @@
         targetBody.innerHTML = '';
         
         if (!data.length) {
-            targetBody.innerHTML = `<tr><td colspan="${isDispatcher ? 6 : 5}" class="text-center py-4 text-muted">
+            targetBody.innerHTML = `<tr><td colspan="${isDispatcher ? 6 : 6}" class="text-center py-4 text-muted">
                 <i class="bi bi-inbox display-6 d-block mb-2"></i>Нет рейсов на выбранную дату
             </td></tr>`;
             return;
@@ -370,7 +425,15 @@
                     <td>${formatDateTime(trip.departure_time)}</td>
                     <td>${formatDateTime(trip.arrival_time)}</td>
                     <td><span class="badge bg-success fs-6">${trip.price} ₽</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" data-buy="${trip.id}" title="Купить билет">
+                            <i class="bi bi-cart-check me-1"></i>Купить
+                        </button>
+                    </td>
                 `;
+                tr.querySelector('button[data-buy]').addEventListener('click', () => {
+                    openPurchaseModal(trip);
+                });
             }
             targetBody.appendChild(tr);
         });
@@ -450,11 +513,18 @@
             return;
         }
         
+        const consent = document.getElementById('regConsent').checked;
+        if (!consent) {
+            showAlert('Необходимо согласие на обработку персональных данных', 'danger');
+            return;
+        }
+        
         const data = {
             email: document.getElementById('regEmail').value,
             username: document.getElementById('regUsername').value,
             password: password,
-            is_dispatcher: document.getElementById('isDispatcher').checked
+            is_dispatcher: document.getElementById('isDispatcher').checked,
+            consent_to_processing: consent
         };
         
         try {
@@ -560,6 +630,64 @@
     function showAlert(message, type) {
         authAlert.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
     }
+
+    function showPurchaseAlert(message, type) {
+        const purchaseAlert = document.getElementById('purchaseAlert');
+        purchaseAlert.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+    }
+
+    function openPurchaseModal(trip) {
+        document.getElementById('purchaseTripId').value = trip.id;
+        document.getElementById('purchaseFullName').value = '';
+        document.getElementById('purchaseEmail').value = '';
+        document.getElementById('purchaseConsent').checked = false;
+        document.getElementById('purchaseTripDetails').innerHTML = `
+            <strong>${trip.origin}</strong> → <strong>${trip.destination}</strong><br>
+            Отправление: ${formatDateTime(trip.departure_time)}<br>
+            Прибытие: ${formatDateTime(trip.arrival_time)}<br>
+            Цена: <span class="badge bg-success">${trip.price} ₽</span>
+        `;
+        const modal = new bootstrap.Modal(document.getElementById('purchaseTicketModal'));
+        modal.show();
+    }
+
+    // Форма покупки билета
+    document.getElementById('purchaseTicketForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const consent = document.getElementById('purchaseConsent').checked;
+        if (!consent) {
+            showPurchaseAlert('Необходимо согласие на обработку персональных данных', 'danger');
+            return;
+        }
+        
+        const data = {
+            trip_id: parseInt(document.getElementById('purchaseTripId').value),
+            full_name: document.getElementById('purchaseFullName').value,
+            email: document.getElementById('purchaseEmail').value,
+            consent_to_processing: consent
+        };
+        
+        try {
+            const res = await fetch('/api/tickets/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (res.ok) {
+                showPurchaseAlert(`Билет успешно куплен! Номер билета: ${result.ticket_number}. Билет отправлен на email: ${result.email}`, 'success');
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('purchaseTicketModal'));
+                    modal.hide();
+                    document.getElementById('purchaseTicketForm').reset();
+                }, 3000);
+            } else {
+                showPurchaseAlert(result.detail || 'Ошибка покупки билета', 'danger');
+            }
+        } catch (error) {
+            showPurchaseAlert('Ошибка соединения с сервером', 'danger');
+        }
+    });
 
     // Проверка авторизации при загрузке
     (async () => {

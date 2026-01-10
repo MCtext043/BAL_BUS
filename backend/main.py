@@ -12,6 +12,7 @@ import logging
 from backend.core.database import engine, Base
 from backend.api.auth import router as auth_router
 from backend.api.trips import router as trips_router
+from backend.api.tickets import router as tickets_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ template_env = Environment(loader=FileSystemLoader("templates"))
 # Подключение роутеров
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(trips_router, prefix="/api/trips", tags=["trips"])
+app.include_router(tickets_router, prefix="/api/tickets", tags=["tickets"])
 
 
 @app.on_event("startup")
